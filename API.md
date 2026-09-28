@@ -19,8 +19,11 @@ The generated application exposes typed tRPC under `/api/trpc`; it is not curren
 | `commerce.cart.addLines` | Mutation | `{ cartId: string; lines: { variantId: string; quantity: number }[] }` | Updated `Cart` |
 | `commerce.cart.updateLines` | Mutation | `{ cartId: string; lines: { lineId: string; quantity: number }[] }` | Updated `Cart`; quantity zero removes a line |
 | `commerce.cart.removeLines` | Mutation | `{ cartId: string; lineIds: string[] }` | Updated `Cart` |
+| `adminMedia.status` | Query | none | Admin-only; reports whether Shopify Storefront and Admin API configuration are present without exposing credentials |
+| `adminMedia.products` | Query | none | Admin-only; first 100 published products for the image-manager selector |
+| `adminMedia.uploadProductImage` | Mutation | `{ productId, fileName, mimeType, altText?, imageBase64 }` | Admin-only; validates JPG/PNG/WebP bytes up to 8 MiB, stages the upload, then attaches it with Shopify Admin GraphQL |
 
-Normalized frontend commerce contracts are declared in `shared/commerce/types.ts`. Never return raw Shopify GraphQL `edges/nodes`, private tokens, or Admin API responses to a browser.
+Normalized frontend commerce contracts are declared in `shared/commerce/types.ts`. Never return raw Shopify GraphQL `edges/nodes`, private tokens, or Admin API responses to a browser. Image uploads require a server-only `SHOPIFY_ADMIN_ACCESS_TOKEN` with `write_files` and `write_products` scopes; the app returns only a safe product title/status after Shopify accepts the media.
 
 ## Planned domain API (not yet implemented)
 

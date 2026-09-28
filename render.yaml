@@ -35,3 +35,7 @@ services:
         sync: false
       - key: SHOPIFY_STOREFRONT_API_ACCESS_TOKEN
         sync: false
+      - key: SHOPIFY_ADMIN_ACCESS_TOKEN
+        sync: false
+      - key: OWNER_OPEN_ID
+        sync: false

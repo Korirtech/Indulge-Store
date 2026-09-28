@@ -2,7 +2,7 @@
 
 ## Security posture for this milestone
 
-The project uses managed Manus OAuth/session and a server-side Shopify Storefront adapter. Shopify-hosted checkout owns payment collection. This milestone does not process card data, does not initiate live M-Pesa requests, does not create paid orders in application code, and does not implement the complete RBAC/admin system described in the source brief.
+The project uses managed Manus OAuth/session, a server-side Shopify Storefront adapter, and a narrowly scoped admin-media path. Shopify-hosted checkout owns payment collection. This milestone does not process card data, does not initiate live M-Pesa requests, does not create paid orders in application code, and does not implement the complete RBAC/admin system described in the source brief.
 
 ## Required controls
 
@@ -12,7 +12,7 @@ The project uses managed Manus OAuth/session and a server-side Shopify Storefron
 - **Authorization:** Scope customer addresses, orders, returns, reviews and support tickets to the authenticated owner. Store-manager permissions must exclude account/security settings. Seller access is disabled until isolation tests pass.
 - **Validation:** Validate inputs on server and client; constrain quantities and identifiers; sanitize any rich text; use parameterized ORM queries; return safe error messages.
 - **Abuse protection:** Add rate limits and abuse controls before enabling public registration, contact, review, coupon, or payment endpoints. Avoid revealing whether sensitive account identifiers exist.
-- **Uploads:** Use managed object storage, allowlisted MIME types and size limits, safe object keys, and malware scanning where supported. Never store raw file bytes in SQL.
+- **Uploads:** Product-image changes use `adminProcedure` on the backend; hiding the page link is not authorization. Accept only JPG/PNG/WebP up to 8 MiB, verify the file signature against the declared MIME type, stage the bytes through Shopify, and keep `SHOPIFY_ADMIN_ACCESS_TOKEN` server-only. The app does not persist image bytes in SQL or local disk. Review/quarantine workflows and malware scanning are not implemented.
 - **Webhooks:** For any future M-Pesa/payment/courier webhook, verify provider authenticity, event timestamp/replay constraints, idempotency key, amount/currency/order correlation and state-machine transition. Persist audit evidence without logging secrets or unnecessary PII.
 - **Data protection:** Collect minimum data, protect PII by role, define retention/export/deletion handling, and avoid storing PAN/card security codes or M-Pesa PINs.
 - **Headers/transport:** Use HTTPS, secure/HttpOnly/SameSite cookies as appropriate, restricted CORS, security headers, CSRF safeguards for cookie-authenticated writes, and dependency updates.

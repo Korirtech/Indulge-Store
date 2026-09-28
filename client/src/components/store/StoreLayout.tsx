@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "./WishlistContext";
 import { formatMoney } from "@/lib/format";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 function SearchBox({ mobile = false }: { mobile?: boolean }) {
   const [value, setValue] = useState("");
@@ -23,6 +24,7 @@ function SearchBox({ mobile = false }: { mobile?: boolean }) {
 function Header() {
   const { itemCount, openCart } = useCart();
   const { ids } = useWishlist();
+  const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   return <>
     <div className="top-ribbon"><span>Curated essentials for everyday rituals</span><span className="top-ribbon__right">Shopping in KES <i>·</i> Kenya-first setup</span></div>
@@ -30,7 +32,7 @@ function Header() {
       <div className="site-header__main">
         <button type="button" className="icon-button menu-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}>{menuOpen ? <X size={21} /> : <Menu size={21} />}</button>
         <Link href="/" className="brand-lockup" aria-label="Indulge Essentials home"><span className="brand-mark">i</span><span className="brand-name">indulge<span>essentials</span></span></Link>
-        <nav className="desktop-nav" aria-label="Main navigation"><Link href="/shop">Shop</Link><Link href="/pages/about">Our point of view</Link></nav>
+        <nav className="desktop-nav" aria-label="Main navigation"><Link href="/shop">Shop</Link><Link href="/pages/about">Our point of view</Link>{user?.role === "admin" && <Link href="/admin/product-images">Manage images</Link>}</nav>
         <div className="header-search"><SearchBox /></div>
         <div className="header-actions">
           <Link href="/account" className="header-action"><UserRound size={20} /><span>Account</span></Link>
@@ -39,7 +41,7 @@ function Header() {
         </div>
       </div>
       <div className="mobile-search"><SearchBox mobile /></div>
-      <nav className={`mobile-menu${menuOpen ? " is-open" : ""}`} aria-label="Mobile navigation"><Link href="/shop" onClick={() => setMenuOpen(false)}>Shop the edit</Link><Link href="/pages/about" onClick={() => setMenuOpen(false)}>Our point of view</Link><Link href="/pages/shipping" onClick={() => setMenuOpen(false)}>Delivery information</Link></nav>
+      <nav className={`mobile-menu${menuOpen ? " is-open" : ""}`} aria-label="Mobile navigation"><Link href="/shop" onClick={() => setMenuOpen(false)}>Shop the edit</Link><Link href="/pages/about" onClick={() => setMenuOpen(false)}>Our point of view</Link><Link href="/pages/shipping" onClick={() => setMenuOpen(false)}>Delivery information</Link>{user?.role === "admin" && <Link href="/admin/product-images" onClick={() => setMenuOpen(false)}>Manage product images</Link>}</nav>
     </header>
   </>;
 }

@@ -8,6 +8,7 @@ A premium, mobile-first Kenyan essentials storefront concept for English-languag
 - Express + tRPC backend; Shopify headless storefront adapter and normalized commerce types.
 - Managed MySQL/TiDB + Drizzle and Manus OAuth scaffold.
 - Shopify is intended to own products, variants, prices, stock, cart and hosted checkout.
+- Protected `/admin/product-images` screen for store admins to add JPG, PNG, and WebP product media directly to Shopify; the Admin API token stays server-side.
 - Single-vendor launch model; marketplace functionality stays disabled.
 
 ## Run / validate
@@ -24,9 +25,10 @@ The live Shopify probe requires a connected, claimed development store, server-s
 ## Setup still required
 
 1. Claim the new development store from the project settings and replace the preview product with the real approved catalog.
-2. Configure Shopify checkout, currency, shipping/tax rules, customer policy pages and a Kenya-supported payment provider.
-3. Confirm whether M-Pesa is available through the merchant's configured provider. M-Pesa is not active in this code milestone; never advertise it until the full sandbox/live callback and reconciliation flow is verified.
-4. Configure production domain, support contacts, notification services, analytics consent, and all required launch policies.
+2. For image uploads, install a Shopify custom app with `write_files` and `write_products` scopes, set `SHOPIFY_ADMIN_ACCESS_TOKEN` as a server secret, and grant the intended owner the `admin` role.
+3. Configure Shopify checkout, currency, shipping/tax rules, customer policy pages and a Kenya-supported payment provider.
+4. Confirm whether M-Pesa is available through the merchant's configured provider. M-Pesa is not active in this code milestone; never advertise it until the full sandbox/live callback and reconciliation flow is verified.
+5. Configure production domain, support contacts, notification services, analytics consent, and all required launch policies.
 
 ## Documentation
 

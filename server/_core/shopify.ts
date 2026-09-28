@@ -2,8 +2,8 @@
  * Shopify Storefront API adapter.
  *
  * All Storefront access — catalog reads and cart reads/writes — goes through
- * this module. The Admin token is intentionally not used in app code; product
- * setup is performed once via the Shopify MCP tools.
+ * this module. This adapter uses only the server-side Storefront API token;
+ * owner-only product-media mutations live in the separate Shopify Admin adapter.
  *
  * Layout follows the rest of `server/_core/*`:
  *   1. Transport (`storefrontFetch`) with TRPCError mapping

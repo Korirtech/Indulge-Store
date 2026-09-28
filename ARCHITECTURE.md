@@ -14,6 +14,8 @@ flowchart LR
   RPC --> APP[Express + tRPC application]
   APP --> NORM[Commerce normalization layer]
   NORM --> SF[Shopify Storefront API]
+  APP --> ADM[Shopify Admin GraphQL API<br/>admin media only]
+  ADM --> SHOP
   SF --> SHOP[Shopify catalog, cart, checkout, order and payment settings]
   APP --> AUTH[Manus OAuth / session]
   APP --> DB[(Managed MySQL / TiDB via Drizzle)]
@@ -48,11 +50,11 @@ The project scaffold provides Express, tRPC, Drizzle, MySQL/TiDB, and Manus OAut
 
 ## 3. Security boundaries
 
-- Shopify Storefront credentials are server-side environment values only; never bundle them into Vite variables or return them through tRPC.
+- Shopify Storefront and Admin credentials are server-side environment values only; never bundle them into Vite variables or return them through tRPC. The Admin API token is used only by the admin-media server module.
 - All Shopify requests go through the injected server scaffold. Do not call Shopify directly from React or write a second GraphQL client.
 - Checkout is hosted by Shopify; the app does not handle card data or mark an order paid.
 - Use schema validation, server-side authorization, secure session cookies, rate limits for public mutation endpoints, and minimal personal-data collection.
-- Administrative and seller features are not enabled just because a route is hidden; every future mutation requires backend role checks.
+- `/admin/product-images` is an implemented narrow admin feature: tRPC `adminProcedure` gates product listing and upload; the server checks MIME/signature and an 8 MiB size limit before staging media through Shopify. Broader administrative and seller features still require backend role checks and audit controls.
 
 ## 4. Roles and permission matrix
 
@@ -88,8 +90,9 @@ The live app uses tRPC at `/api/trpc` rather than hand-written REST. Current int
 - `/wishlist` — saved products (persist locally for guest preview; account synchronization is a later feature).
 - `/pages/shipping`, `/pages/returns`, `/pages/contact`, `/pages/privacy`, `/pages/terms` — clear policy/support destinations.
 
-### Administration (later milestone)
-- `/admin` dashboard; `/admin/products`; `/admin/inventory`; `/admin/orders`; `/admin/customers`; `/admin/promotions`; `/admin/reviews`; `/admin/returns`; `/admin/support`; `/admin/reports`; `/admin/settings`.
+### Administration
+- `/admin/product-images` — owner/admin-only product image upload, contingent on Shopify Admin API credentials and `write_files` / `write_products` scopes.
+- Remaining later-stage routes: `/admin` dashboard; `/admin/products`; `/admin/inventory`; `/admin/orders`; `/admin/customers`; `/admin/promotions`; `/admin/reviews`; `/admin/returns`; `/admin/support`; `/admin/reports`; `/admin/settings`.
 - Admin routes must not be exposed as active capabilities until protected server procedures and role grants exist.
 
 ## 7. Development roadmap

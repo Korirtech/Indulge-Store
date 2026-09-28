@@ -8,7 +8,8 @@ import Home from "./pages/StoreHome";
 import Shop from "./pages/Shop";
 import ProductDetail from "./pages/ProductDetail";
 import WishlistPage from "./pages/WishlistPage";
-import InfoPage from "./pages/InfoPage";
+import InfoPage from "@/pages/InfoPage";
+import AdminProductImages from "@/pages/AdminProductImages";
 import StoreLayout from "./components/store/StoreLayout";
 import { CartProvider } from "./contexts/CartContext";
 import { WishlistProvider } from "./components/store/WishlistContext";
@@ -22,6 +23,7 @@ function Router() {
           <Route path="/" component={() => <StoreLayout><Home /></StoreLayout>} />
           <Route path="/shop" component={() => <StoreLayout><Shop /></StoreLayout>} />
           <Route path="/products/:handle">{params => <StoreLayout><ProductDetail handle={params.handle} /></StoreLayout>}</Route>
+          <Route path="/admin/product-images" component={() => <StoreLayout><AdminProductImages /></StoreLayout>} />
           <Route path="/wishlist" component={() => <StoreLayout><WishlistPage /></StoreLayout>} />
           <Route path="/account" component={() => <StoreLayout><InfoPage /></StoreLayout>} />
           <Route path="/pages/:slug" component={() => <StoreLayout><InfoPage /></StoreLayout>} />
