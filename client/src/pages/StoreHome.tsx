@@ -6,7 +6,7 @@ import ProductCard from "@/components/store/ProductCard";
 import { useWishlist } from "@/components/store/WishlistContext";
 
 const PRODUCT_LIST_INPUT = { first: 25 } as const;
-const HERO_IMAGE = "/manus-storage/indulge-home-hero-optimized_e1a9033e.jpg";
+const HERO_IMAGE = "/images/indulge-editorial-hero.jpg";
 
 export default function StoreHome() {
   const { data: products = [], isLoading, error } = trpc.commerce.products.list.useQuery(PRODUCT_LIST_INPUT);

@@ -9,6 +9,7 @@ A premium, mobile-first Kenyan essentials storefront concept for English-languag
 - Managed MySQL/TiDB + Drizzle and Manus OAuth scaffold.
 - Shopify is intended to own products, variants, prices, stock, cart and hosted checkout.
 - Protected `/admin/catalog` dashboard for store admins to search products, add or manage existing product images, edit variant prices, and update location-level available stock; Shopify Admin credentials stay server-side.
+- Original editorial homepage imagery is served locally; shopper pages are route-split, the cart uses an accessible modal, and browser storage failure no longer blocks guest shopping.
 - Single-vendor launch model; marketplace functionality stays disabled.
 
 ## Run / validate

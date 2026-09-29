@@ -5,6 +5,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "./WishlistContext";
 import { formatMoney } from "@/lib/format";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 function SearchBox({ mobile = false }: { mobile?: boolean }) {
   const [value, setValue] = useState("");
@@ -37,7 +38,7 @@ function Header() {
         <div className="header-actions">
           <Link href="/account" className="header-action"><UserRound size={20} /><span>Account</span></Link>
           <Link href="/wishlist" className="header-action" aria-label={`Saved items, ${ids.length} saved`}><Heart size={20} /><span>Saved</span>{ids.length > 0 && <b className="count-pill">{ids.length}</b>}</Link>
-          <button type="button" className="header-action" onClick={openCart} aria-label={`Shopping bag, ${itemCount} items`}><span className="bag-icon"><ShoppingBag size={20} />{itemCount > 0 && <b className="count-dot">{itemCount}</b>}</span><span>Bag</span></button>
+          <button id="shopping-bag-button" type="button" className="header-action" onClick={openCart} aria-label={`Shopping bag, ${itemCount} items`}><span className="bag-icon"><ShoppingBag size={20} />{itemCount > 0 && <b className="count-dot">{itemCount}</b>}</span><span>Bag</span></button>
         </div>
       </div>
       <div className="mobile-search"><SearchBox mobile /></div>
@@ -48,21 +49,20 @@ function Header() {
 
 function CartDrawer() {
   const { cart, isOpen, closeCart, loading, updateQuantity, removeItem, proceedToCheckout } = useCart();
-  if (!isOpen) return null;
-  return <div className="cart-layer"><button className="cart-backdrop" onClick={closeCart} aria-label="Close shopping bag" />
-    <section className="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cart-title">
-      <div className="cart-panel__header"><div><p className="eyebrow">YOUR EDIT</p><h2 id="cart-title">Shopping bag <span>({cart?.itemCount ?? 0})</span></h2></div><button type="button" className="icon-button" onClick={closeCart} aria-label="Close shopping bag"><X size={21} /></button></div>
+  return <Dialog open={isOpen} onOpenChange={open => { if (!open) closeCart(); }}>
+    <DialogContent className="cart-panel cart-dialog" showCloseButton={false} aria-describedby="cart-description" onCloseAutoFocus={event => { event.preventDefault(); document.getElementById("shopping-bag-button")?.focus(); }}>
+      <div className="cart-panel__header"><div><p className="eyebrow">YOUR EDIT</p><DialogTitle id="cart-title">Shopping bag <span>({cart?.itemCount ?? 0})</span></DialogTitle><DialogDescription id="cart-description" className="sr-only">Review or update items in your shopping bag.</DialogDescription></div><DialogClose className="icon-button" aria-label="Close shopping bag"><X size={21} /></DialogClose></div>
       {!cart || cart.items.length === 0 ? <div className="cart-empty"><div className="cart-empty__icon"><ShoppingBag size={24} /></div><h3>Your bag is taking a breather.</h3><p>Browse the current edit and save anything that catches your eye.</p><Link className="button button--dark" href="/shop" onClick={closeCart}>Explore the shop <ArrowRight size={16} /></Link></div> : <>
         <div className="cart-lines">{cart.items.map(item => <article className="cart-line" key={item.lineId}>
           <div className="cart-line__image">{item.image ? <img src={item.image.url} alt={item.image.altText || item.productTitle} /> : <span>IE</span>}</div>
           <div className="cart-line__details"><Link href={`/products/${item.productHandle}`} onClick={closeCart}>{item.productTitle}</Link>{item.variantTitle !== "Default Title" && <small>{item.variantTitle}</small>}<strong>{formatMoney(item.lineTotal)}</strong>
-            <div className="quantity-control" aria-label={`Quantity for ${item.productTitle}`}><button type="button" disabled={loading} aria-label="Decrease quantity" onClick={() => void updateQuantity(item.lineId, item.quantity - 1)}><Minus size={13} /></button><span>{item.quantity}</span><button type="button" disabled={loading} aria-label="Increase quantity" onClick={() => void updateQuantity(item.lineId, item.quantity + 1)}><Plus size={13} /></button></div>
+            <div className="quantity-control" aria-label={`Quantity for ${item.productTitle}`}><button type="button" disabled={loading} aria-label={`Decrease quantity of ${item.productTitle}`} onClick={() => void updateQuantity(item.lineId, item.quantity - 1)}><Minus size={13} /></button><span aria-live="polite">{item.quantity}</span><button type="button" disabled={loading} aria-label={`Increase quantity of ${item.productTitle}`} onClick={() => void updateQuantity(item.lineId, item.quantity + 1)}><Plus size={13} /></button></div>
           </div><button type="button" className="remove-line" aria-label={`Remove ${item.productTitle}`} disabled={loading} onClick={() => void removeItem(item.lineId)}><Trash2 size={16} /></button>
         </article>)}</div>
         <div className="cart-panel__bottom"><div className="cart-subtotal"><span>Subtotal</span><strong>{formatMoney(cart.subtotal)}</strong></div><p>Shipping and any applicable taxes are confirmed at checkout.</p><button type="button" className="button button--dark button--full" onClick={proceedToCheckout} disabled={loading || cart.itemCount === 0}>Continue to secure checkout <ArrowRight size={16} /></button><button type="button" className="text-button cart-continue" onClick={closeCart}>Continue browsing</button></div>
       </>}
-    </section>
-  </div>;
+    </DialogContent>
+  </Dialog>;
 }
 
 function Footer() {
@@ -81,5 +81,5 @@ function MobileDock() {
 }
 
 export default function StoreLayout({ children }: { children: ReactNode }) {
-  return <div className="store-shell"><Header /><main id="main-content">{children}</main><Footer /><MobileDock /><CartDrawer /></div>;
+  return <div className="store-shell"><a href="#main-content" className="skip-link">Skip to content</a><Header /><main id="main-content" tabIndex={-1}>{children}</main><Footer /><MobileDock /><CartDrawer /></div>;
 }
