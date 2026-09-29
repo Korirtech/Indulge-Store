@@ -13,6 +13,11 @@ const originalEnv = {
   domain: process.env.SHOPIFY_STORE_DOMAIN,
   token: process.env.SHOPIFY_ADMIN_ACCESS_TOKEN,
 };
+const productId = "gid://shopify/Product/12";
+const variantId = "gid://shopify/ProductVariant/34";
+const mediaId = "gid://shopify/MediaImage/56";
+const locationId = "gid://shopify/Location/78";
+const idempotencyKey = "123e4567-e89b-42d3-a456-426614174000";
 
 function makeCtx(role: AuthenticatedUser["role"] = "admin"): TrpcContext {
   const now = new Date();
@@ -68,7 +73,7 @@ describe("Shopify product-image upload", () => {
   it("rejects malformed base64 before making a network request", async () => {
     await expect(
       uploadProductImage({
-        productId: "gid://shopify/Product/12",
+        productId,
         fileName: "image.jpg",
         mimeType: "image/jpeg",
         imageBase64: "not base64!",
@@ -106,7 +111,7 @@ describe("Shopify product-image upload", () => {
         }
         return jsonResponse({
           productUpdate: {
-            product: { id: "gid://shopify/Product/12", title: "Daily Hydration Serum" },
+            product: { id: productId, title: "Daily Hydration Serum" },
             userErrors: [],
           },
         });
@@ -117,18 +122,14 @@ describe("Shopify product-image upload", () => {
     });
 
     const result = await uploadProductImage({
-      productId: "gid://shopify/Product/12",
+      productId,
       fileName: "daily serum.jpg",
       mimeType: "image/jpeg",
       altText: "Daily hydration serum",
       imageBase64: jpegBytes.toString("base64"),
     });
 
-    expect(result).toEqual({
-      productId: "gid://shopify/Product/12",
-      productTitle: "Daily Hydration Serum",
-      status: "processing",
-    });
+    expect(result).toEqual({ productId, productTitle: "Daily Hydration Serum", status: "processing" });
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(graphqlRequests).toHaveLength(2);
     expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("X-Shopify-Access-Token")).toBe("test-admin-token");
@@ -139,7 +140,7 @@ describe("Shopify product-image upload", () => {
       resource: "PRODUCT_IMAGE",
     });
     expect(graphqlRequests[1]?.query).toMatch(/productUpdate\(product:\s*\$product,\s*media:\s*\$media\)/);
-    expect(graphqlRequests[1]?.variables.product.id).toBe("gid://shopify/Product/12");
+    expect(graphqlRequests[1]?.variables.product.id).toBe(productId);
     expect(graphqlRequests[1]?.variables.media[0]).toMatchObject({
       originalSource: "https://staged.example/image.jpg?temporary=token",
       alt: "Daily hydration serum",
@@ -150,17 +151,178 @@ describe("Shopify product-image upload", () => {
     expect(Buffer.from(uploadInit?.body as Uint8Array)).toEqual(jpegBytes);
     expect(new Headers(uploadInit?.headers).get("content_type")).toBe("image/jpeg");
   });
+});
+
+describe("Shopify admin catalog dashboard", () => {
+  it("returns searchable catalog rows with currency and pagination", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      shop: { currencyCode: "KES" },
+      products: {
+        nodes: [{
+          id: productId,
+          title: "Daily Hydration Serum",
+          handle: "daily-hydration-serum",
+          status: "ACTIVE",
+          productType: "Skincare",
+          media: { nodes: [{ image: { url: "https://cdn.example/serum.jpg", altText: "Serum" } }] },
+        }],
+        pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+      },
+    }));
+
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.adminMedia.catalog({ query: "serum", cursor: null });
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+
+    expect(result).toMatchObject({
+      currencyCode: "KES",
+      hasNextPage: true,
+      nextCursor: "cursor-1",
+      products: [{ id: productId, title: "Daily Hydration Serum", imageUrl: "https://cdn.example/serum.jpg" }],
+    });
+    expect(request.variables).toMatchObject({ first: 50, query: "serum", after: null });
+  });
+
+  it("returns active inventory locations only", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      locations: { nodes: [
+        { id: locationId, name: "Nairobi", isActive: true },
+        { id: "gid://shopify/Location/99", name: "Closed", isActive: false },
+      ] },
+    }));
+    const result = await appRouter.createCaller(makeCtx()).adminMedia.locations();
+    expect(result).toEqual([{ id: locationId, name: "Nairobi" }]);
+  });
+
+  it("updates one variant price with productVariantsBulkUpdate", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      productVariantsBulkUpdate: { productVariants: [{ id: variantId, price: "23.50" }], userErrors: [] },
+    }));
+    const result = await appRouter.createCaller(makeCtx()).adminMedia.updateVariantPrice({
+      productId,
+      variantId,
+      price: "23.50",
+    });
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(result).toEqual({ productId, variantId, price: "23.50" });
+    expect(request.query).toContain("productVariantsBulkUpdate");
+    expect(request.variables).toEqual({ productId, variants: [{ id: variantId, price: "23.50" }] });
+  });
+
+  it("rejects an invalid variant price before calling Shopify", async () => {
+    await expect(appRouter.createCaller(makeCtx()).adminMedia.updateVariantPrice({
+      productId,
+      variantId,
+      price: "-10.00",
+    })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("updates alt text only for a ready image in the selected product", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        product: { id: productId, title: "Serum", media: { nodes: [{ id: mediaId, mediaContentType: "IMAGE", status: "READY" }] } },
+      }))
+      .mockResolvedValueOnce(jsonResponse({ fileUpdate: { files: [{ id: mediaId, alt: "Serum bottle" }], userErrors: [] } }));
+
+    const result = await appRouter.createCaller(makeCtx()).adminMedia.updateImageAlt({
+      productId,
+      mediaId,
+      alt: "Serum bottle",
+    });
+    const updateRequest = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(result).toEqual({ productId, mediaId, alt: "Serum bottle" });
+    expect(updateRequest.variables.files).toEqual([{ id: mediaId, alt: "Serum bottle" }]);
+  });
+
+  it("detaches an image from the product without deleting the Shopify file", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        product: { id: productId, title: "Serum", media: { nodes: [{ id: mediaId, mediaContentType: "IMAGE", status: "READY" }] } },
+      }))
+      .mockResolvedValueOnce(jsonResponse({ fileUpdate: { files: [{ id: mediaId, alt: "Serum" }], userErrors: [] } }));
+
+    const result = await appRouter.createCaller(makeCtx()).adminMedia.removeProductImage({ productId, mediaId });
+    const updateRequest = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(result).toEqual({ productId, mediaId, filePreserved: true });
+    expect(updateRequest.query).toContain("fileUpdate");
+    expect(updateRequest.variables.files).toEqual([{ id: mediaId, referencesToRemove: [productId] }]);
+  });
+
+  it("sets available inventory with a current-value check and an idempotency directive", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({
+        node: {
+          id: variantId,
+          product: { id: productId },
+          inventoryItem: { id: "gid://shopify/InventoryItem/90", tracked: true, inventoryLevel: { isActive: true, quantities: [{ name: "available", quantity: 4 }] } },
+        },
+      }))
+      .mockResolvedValueOnce(jsonResponse({ inventorySetQuantities: { userErrors: [] } }));
+
+    const result = await appRouter.createCaller(makeCtx()).adminMedia.setInventory({
+      productId,
+      variantId,
+      locationId,
+      quantity: 7,
+      expectedCurrent: 4,
+      idempotencyKey,
+    });
+    const request = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body));
+    expect(result).toEqual({ productId, variantId, locationId, previousQuantity: 4, quantity: 7 });
+    expect(request.query).toContain("@idempotent(key: $idempotencyKey)");
+    expect(request.variables.idempotencyKey).toBe(idempotencyKey);
+    expect(request.variables.input.quantities[0]).toMatchObject({
+      inventoryItemId: "gid://shopify/InventoryItem/90",
+      locationId,
+      quantity: 7,
+      changeFromQuantity: 4,
+    });
+  });
+
+  it("rejects a stale stock value and never sends an inventory write", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      node: {
+        id: variantId,
+        product: { id: productId },
+        inventoryItem: { id: "gid://shopify/InventoryItem/90", tracked: true, inventoryLevel: { isActive: true, quantities: [{ name: "available", quantity: 5 }] } },
+      },
+    }));
+
+    await expect(appRouter.createCaller(makeCtx()).adminMedia.setInventory({
+      productId,
+      variantId,
+      locationId,
+      quantity: 7,
+      expectedCurrent: 4,
+      idempotencyKey,
+    })).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a regular customer from catalog queries and catalog mutations", async () => {
+    const caller = appRouter.createCaller(makeCtx("user"));
+    await expect(caller.adminMedia.catalog({ query: "serum", cursor: null })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.adminMedia.updateVariantPrice({ productId, variantId, price: "23.50" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.adminMedia.setInventory({
+      productId,
+      variantId,
+      locationId,
+      quantity: 7,
+      expectedCurrent: 4,
+      idempotencyKey,
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
   it("does not allow a regular signed-in customer to use admin upload mutations", async () => {
     const caller = appRouter.createCaller(makeCtx("user"));
-    await expect(
-      caller.adminMedia.uploadProductImage({
-        productId: "gid://shopify/Product/12",
-        fileName: "image.jpg",
-        mimeType: "image/jpeg",
-        imageBase64: jpegBytes.toString("base64"),
-      })
-    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.adminMedia.uploadProductImage({
+      productId,
+      fileName: "image.jpg",
+      mimeType: "image/jpeg",
+      imageBase64: jpegBytes.toString("base64"),
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

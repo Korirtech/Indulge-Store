@@ -14,7 +14,7 @@ flowchart LR
   RPC --> APP[Express + tRPC application]
   APP --> NORM[Commerce normalization layer]
   NORM --> SF[Shopify Storefront API]
-  APP --> ADM[Shopify Admin GraphQL API<br/>admin media only]
+  APP --> ADM[Shopify Admin GraphQL API<br/>protected catalog management]
   ADM --> SHOP
   SF --> SHOP[Shopify catalog, cart, checkout, order and payment settings]
   APP --> AUTH[Manus OAuth / session]
@@ -54,7 +54,7 @@ The project scaffold provides Express, tRPC, Drizzle, MySQL/TiDB, and Manus OAut
 - All Shopify requests go through the injected server scaffold. Do not call Shopify directly from React or write a second GraphQL client.
 - Checkout is hosted by Shopify; the app does not handle card data or mark an order paid.
 - Use schema validation, server-side authorization, secure session cookies, rate limits for public mutation endpoints, and minimal personal-data collection.
-- `/admin/product-images` is an implemented narrow admin feature: tRPC `adminProcedure` gates product listing and upload; the server checks MIME/signature and an 8 MiB size limit before staging media through Shopify. Broader administrative and seller features still require backend role checks and audit controls.
+- `/admin/catalog` (alias `/admin/product-images`) uses tRPC `adminProcedure` for product search, image upload/alt text/removal, variant price changes, and location stock updates. The server validates image MIME/signature/8 MiB size and Admin identifiers; inventory writes use Shopify's current-quantity compare-and-set and idempotency. Broader administrative and seller features still require backend role checks and audit controls.
 
 ## 4. Roles and permission matrix
 
@@ -91,7 +91,7 @@ The live app uses tRPC at `/api/trpc` rather than hand-written REST. Current int
 - `/pages/shipping`, `/pages/returns`, `/pages/contact`, `/pages/privacy`, `/pages/terms` — clear policy/support destinations.
 
 ### Administration
-- `/admin/product-images` — owner/admin-only product image upload, contingent on Shopify Admin API credentials and `write_files` / `write_products` scopes.
+- `/admin/catalog` — owner/admin-only product gallery management, variant price editing, and per-location available-stock updates; contingent on Shopify Admin API credentials and product, file, inventory, and location scopes. `/admin/product-images` remains an alias.
 - Remaining later-stage routes: `/admin` dashboard; `/admin/products`; `/admin/inventory`; `/admin/orders`; `/admin/customers`; `/admin/promotions`; `/admin/reviews`; `/admin/returns`; `/admin/support`; `/admin/reports`; `/admin/settings`.
 - Admin routes must not be exposed as active capabilities until protected server procedures and role grants exist.
 

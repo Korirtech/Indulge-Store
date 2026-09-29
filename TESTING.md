@@ -3,7 +3,7 @@
 ## Automated checks in the repository
 
 - `pnpm check` — TypeScript compile check.
-- `pnpm test` — Vitest suite, including the scaffold auth logout test, Shopify commerce tests, and the live Shopify smoke test when credentials/catalog are present.
+- `pnpm test` — Vitest suite, including the scaffold auth logout test, Shopify commerce tests, protected Admin API validation/authorization tests, and the live Shopify smoke test when credentials/catalog are present.
 - `pnpm build` — production bundle and Node server build.
 - `pnpm shopify:probe` — optional live normalized-catalog probe; requires an active published product with title, image and positive price.
 
@@ -19,6 +19,15 @@ Record actual command results in the delivery summary; do not equate a skipped l
 6. Start checkout; confirm navigation uses Shopify's returned hosted URL and that no application screen claims payment success.
 7. Test empty cart, product unavailable, network error, stale cart ID and repeated add/remove interactions.
 8. Test keyboard focus, visible focus rings, labels, contrast, reduced motion, narrow 320px layout, 375px, 414px, 768px, 1024px, 1280px and 1440px+.
+
+## Admin catalog dashboard acceptance (requires an admin account and Shopify Admin token)
+
+1. Confirm a regular customer is denied; sign in as an approved admin and verify catalog search and pagination.
+2. Select an existing product; verify image thumbnails/status, variants, shop currency, active locations, and available quantities.
+3. Update an image's alt text; remove another image and confirm it is detached only from that product while its Shopify Files entry remains.
+4. Add a JPG, PNG, and WebP image; confirm unsupported MIME/signature, zero-byte, oversized, and more-than-eight-file batches are rejected.
+5. Change a variant price and verify the saved value is reflected by Shopify.
+6. Set available stock at a selected active location; confirm a stale expected quantity causes a conflict and does not overwrite newer stock.
 
 ## Production commerce tests (not completed until credentials are configured)
 

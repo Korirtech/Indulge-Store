@@ -8,9 +8,9 @@ These items require store-owner credentials, decisions, or real-world verificati
 - [ ] Confirm products are active and published to the intended sales channel.
 
 ## Admin image uploads
-- [ ] Create/install a Shopify custom app with `write_files` and `write_products` scopes.
+- [ ] Create/install a Shopify custom app with `read_products`, `write_products`, `write_files`, `read_inventory`, `write_inventory`, and `read_locations` scopes.
 - [ ] Add its Admin API token as the server-only `SHOPIFY_ADMIN_ACCESS_TOKEN` secret; never expose it through a `VITE_` variable.
-- [ ] Grant the intended owner account the `admin` role (WebDev owner bootstrap or approved database operation).
+- [ ] Grant the intended owner account the `admin` role (WebDev owner bootstrap or approved database operation) and ensure the corresponding Shopify staff user has matching product, file, inventory, and location permissions.
 
 ## Hosting and operations
 - [ ] Configure the production database, OAuth callback/origin, Storefront token, and any external Forge/storage values for the chosen host.
