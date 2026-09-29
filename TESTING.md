@@ -4,6 +4,7 @@
 
 - `pnpm check` — TypeScript compile check.
 - `pnpm test` — Vitest suite, including the scaffold auth logout test, Shopify commerce tests, protected Admin API validation/authorization tests, and the live Shopify smoke test when credentials/catalog are present.
+- `server/safe-storage.test.ts` — guest cart/wishlist storage read/write/removal failure handling.
 - `pnpm build` — production bundle and Node server build.
 - `pnpm shopify:probe` — optional live normalized-catalog probe; requires an active published product with title, image and positive price.
 
@@ -14,7 +15,7 @@ Record actual command results in the delivery summary; do not equate a skipped l
 1. Load `/` on desktop and mobile; check logo/navigation, search field, category links, hero CTA and footer.
 2. Search for the preview item by title; verify no-result and matching-result states.
 3. Open the product; check image alt text, price/currency, availability, quantity control and disabled state for unavailable product.
-4. Add to cart; verify cart opens, item count and subtotal match the server-returned cart.
+4. Add to cart; verify cart opens, item count and subtotal match the server-returned cart. Close with Escape and verify focus returns to the bag button.
 5. Increase/decrease quantity and remove the item; reload to verify local cart ID rehydrates where supported.
 6. Start checkout; confirm navigation uses Shopify's returned hosted URL and that no application screen claims payment success.
 7. Test empty cart, product unavailable, network error, stale cart ID and repeated add/remove interactions.

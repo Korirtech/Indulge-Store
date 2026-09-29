@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import type { Cart } from "@shared/commerce/types";
+import { readStoredValue, removeStoredValue, writeStoredValue } from "@/lib/safe-storage";
 import {
   createContext,
   ReactNode,
@@ -23,14 +24,12 @@ import {
 const CART_STORAGE_KEY = "commerce:cart-id";
 
 function readStoredCartId(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(CART_STORAGE_KEY);
+  return readStoredValue(CART_STORAGE_KEY);
 }
 
 function writeStoredCartId(value: string | null) {
-  if (typeof window === "undefined") return;
-  if (value) window.localStorage.setItem(CART_STORAGE_KEY, value);
-  else window.localStorage.removeItem(CART_STORAGE_KEY);
+  if (value) writeStoredValue(CART_STORAGE_KEY, value);
+  else removeStoredValue(CART_STORAGE_KEY);
 }
 
 type CartContextValue = {

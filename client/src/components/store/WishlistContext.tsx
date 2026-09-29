@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { readStoredValue, removeStoredValue, writeStoredValue } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "indulge:wishlist:v1";
 
@@ -16,23 +17,22 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) {
+    const saved = readStoredValue(STORAGE_KEY);
+    if (saved) {
+      try {
         const parsed: unknown = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.every(value => typeof value === "string")) {
           setIds(parsed);
         }
+      } catch {
+        removeStoredValue(STORAGE_KEY);
       }
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } finally {
-      setReady(true);
     }
+    setReady(true);
   }, []);
 
   useEffect(() => {
-    if (ready) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+    if (ready) writeStoredValue(STORAGE_KEY, JSON.stringify(ids));
   }, [ids, ready]);
 
   const isSaved = useCallback((id: string) => ids.includes(id), [ids]);
