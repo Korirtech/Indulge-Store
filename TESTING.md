@@ -22,7 +22,7 @@ Record actual command results in the delivery summary; do not equate a skipped l
 
 ## Admin catalog dashboard acceptance (requires an admin account and Shopify Admin token)
 
-1. Confirm a regular customer is denied; sign in as an approved admin and verify catalog search and pagination.
+1. Confirm anonymous requests receive `UNAUTHORIZED`, regular signed-in customers receive `FORBIDDEN` across dashboard endpoints, and an approved admin can use catalog search and pagination.
 2. Select an existing product; verify image thumbnails/status, variants, shop currency, active locations, and available quantities.
 3. Update an image's alt text; remove another image and confirm it is detached only from that product while its Shopify Files entry remains.
 4. Add a JPG, PNG, and WebP image; confirm unsupported MIME/signature, zero-byte, oversized, and more-than-eight-file batches are rejected.

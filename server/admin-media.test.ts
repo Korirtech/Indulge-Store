@@ -19,9 +19,9 @@ const mediaId = "gid://shopify/MediaImage/56";
 const locationId = "gid://shopify/Location/78";
 const idempotencyKey = "123e4567-e89b-42d3-a456-426614174000";
 
-function makeCtx(role: AuthenticatedUser["role"] = "admin"): TrpcContext {
+function makeCtx(role: AuthenticatedUser["role"] | null = "admin"): TrpcContext {
   const now = new Date();
-  const user: AuthenticatedUser = {
+  const user: AuthenticatedUser | null = role === null ? null : {
     id: 7,
     openId: "owner-7",
     email: "owner@example.com",
@@ -300,18 +300,62 @@ describe("Shopify admin catalog dashboard", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects a regular customer from catalog queries and catalog mutations", async () => {
+  it("rejects anonymous requests to every dashboard endpoint before Shopify calls", async () => {
+    const caller = appRouter.createCaller(makeCtx(null));
+    const calls = [
+      caller.adminMedia.status(),
+      caller.adminMedia.catalog({ query: "serum", cursor: null }),
+      caller.adminMedia.productDetails({ productId }),
+      caller.adminMedia.locations(),
+      caller.adminMedia.uploadProductImage({
+        productId,
+        fileName: "image.jpg",
+        mimeType: "image/jpeg",
+        imageBase64: jpegBytes.toString("base64"),
+      }),
+      caller.adminMedia.updateImageAlt({ productId, mediaId, alt: "Serum" }),
+      caller.adminMedia.removeProductImage({ productId, mediaId }),
+      caller.adminMedia.updateVariantPrice({ productId, variantId, price: "23.50" }),
+      caller.adminMedia.setInventory({
+        productId,
+        variantId,
+        locationId,
+        quantity: 7,
+        expectedCurrent: 4,
+        idempotencyKey,
+      }),
+    ];
+
+    await Promise.all(calls.map(call => expect(call).rejects.toMatchObject({ code: "UNAUTHORIZED" })));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects regular customers from every dashboard endpoint before Shopify calls", async () => {
     const caller = appRouter.createCaller(makeCtx("user"));
-    await expect(caller.adminMedia.catalog({ query: "serum", cursor: null })).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(caller.adminMedia.updateVariantPrice({ productId, variantId, price: "23.50" })).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(caller.adminMedia.setInventory({
-      productId,
-      variantId,
-      locationId,
-      quantity: 7,
-      expectedCurrent: 4,
-      idempotencyKey,
-    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const calls = [
+      caller.adminMedia.status(),
+      caller.adminMedia.catalog({ query: "serum", cursor: null }),
+      caller.adminMedia.productDetails({ productId }),
+      caller.adminMedia.locations(),
+      caller.adminMedia.uploadProductImage({
+        productId,
+        fileName: "image.jpg",
+        mimeType: "image/jpeg",
+        imageBase64: jpegBytes.toString("base64"),
+      }),
+      caller.adminMedia.updateImageAlt({ productId, mediaId, alt: "Serum" }),
+      caller.adminMedia.removeProductImage({ productId, mediaId }),
+      caller.adminMedia.updateVariantPrice({ productId, variantId, price: "23.50" }),
+      caller.adminMedia.setInventory({
+        productId,
+        variantId,
+        locationId,
+        quantity: 7,
+        expectedCurrent: 4,
+        idempotencyKey,
+      }),
+    ];
+    await Promise.all(calls.map(call => expect(call).rejects.toMatchObject({ code: "FORBIDDEN" })));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
