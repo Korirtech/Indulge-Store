@@ -148,6 +148,19 @@ const PRODUCT_IMAGE_LOOKUP_QUERY = /* GraphQL */ `
   }
 `;
 
+const VARIANT_PRICE_LOOKUP_QUERY = /* GraphQL */ `
+  query VariantPriceBeforeUpdate($variantId: ID!) {
+    shop { currencyCode }
+    node(id: $variantId) {
+      ... on ProductVariant {
+        id
+        price
+        product { id }
+      }
+    }
+  }
+`;
+
 const UPDATE_VARIANT_PRICE_MUTATION = /* GraphQL */ `
   mutation UpdateProductVariantPrice($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
     productVariantsBulkUpdate(productId: $productId, variants: $variants) {
@@ -559,6 +572,7 @@ export async function uploadProductImage(input: UploadProductImageInput): Promis
   productId: string;
   productTitle: string;
   status: "processing";
+  fileBytes: number;
 }> {
   assertProductGid(input.productId);
   const bytes = decodeAndValidateProductImage(input.imageBase64, input.mimeType);
@@ -603,17 +617,17 @@ export async function uploadProductImage(input: UploadProductImageInput): Promis
   const update = productData.productUpdate;
   throwUserErrors(update.userErrors, "product image upload");
   if (!update.product) throw new TRPCError({ code: "NOT_FOUND", message: "Shopify did not find that product." });
-  return { productId: update.product.id, productTitle: update.product.title, status: "processing" };
+  return { productId: update.product.id, productTitle: update.product.title, status: "processing", fileBytes: bytes.length };
 }
 
-async function getReadyProductImage(productId: string, mediaId: string): Promise<{ id: string; title: string }> {
+async function getReadyProductImage(productId: string, mediaId: string): Promise<{ id: string; title: string; alt: string }> {
   assertProductGid(productId);
   assertMediaImageGid(mediaId);
   const data = await adminGraphql<{
     product: null | {
       id: string;
       title: string;
-      media: { nodes: Array<{ id: string; mediaContentType: string; status: string }> };
+      media: { nodes: Array<{ id: string; alt: string | null; mediaContentType: string; status: string }> };
     };
   }>(PRODUCT_IMAGE_LOOKUP_QUERY, { id: productId });
   if (!data.product) throw new TRPCError({ code: "NOT_FOUND", message: "Shopify did not find that product." });
@@ -622,46 +636,57 @@ async function getReadyProductImage(productId: string, mediaId: string): Promise
   if (image.status !== "READY") {
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Shopify is still processing this image. Try again when it is ready." });
   }
-  return { id: data.product.id, title: data.product.title };
+  return { id: data.product.id, title: data.product.title, alt: image.alt ?? "" };
 }
 
 export async function updateProductImageAlt(input: {
   productId: string;
   mediaId: string;
   alt: string;
-}): Promise<{ productId: string; mediaId: string; alt: string }> {
-  await getReadyProductImage(input.productId, input.mediaId);
+}): Promise<{ productId: string; mediaId: string; previousAlt: string; alt: string }> {
+  const previous = await getReadyProductImage(input.productId, input.mediaId);
   const data = await adminGraphql<{
     fileUpdate: { files: Array<{ id: string; alt: string | null }> | null; userErrors: ShopifyUserError[] };
   }>(UPDATE_IMAGE_ALT_MUTATION, { files: [{ id: input.mediaId, alt: input.alt }] });
   throwUserErrors(data.fileUpdate.userErrors, "image alt-text update");
   const updated = data.fileUpdate.files?.find(file => file.id === input.mediaId);
   if (!updated) throw new TRPCError({ code: "BAD_GATEWAY", message: "Shopify did not confirm the image update." });
-  return { productId: input.productId, mediaId: updated.id, alt: updated.alt ?? "" };
+  return { productId: input.productId, mediaId: updated.id, previousAlt: previous.alt, alt: updated.alt ?? "" };
 }
 
 export async function removeProductImage(input: {
   productId: string;
   mediaId: string;
-}): Promise<{ productId: string; mediaId: string; filePreserved: true }> {
-  await getReadyProductImage(input.productId, input.mediaId);
+}): Promise<{ productId: string; mediaId: string; previousAlt: string; filePreserved: true }> {
+  const previous = await getReadyProductImage(input.productId, input.mediaId);
   const data = await adminGraphql<{
     fileUpdate: { files: Array<{ id: string; alt: string | null }> | null; userErrors: ShopifyUserError[] };
   }>(REMOVE_PRODUCT_IMAGE_REFERENCE_MUTATION, {
     files: [{ id: input.mediaId, referencesToRemove: [input.productId] }],
   });
   throwUserErrors(data.fileUpdate.userErrors, "image removal from product");
-  return { productId: input.productId, mediaId: input.mediaId, filePreserved: true };
+  return { productId: input.productId, mediaId: input.mediaId, previousAlt: previous.alt, filePreserved: true };
 }
 
 export async function updateProductVariantPrice(input: UpdateVariantPriceInput): Promise<{
   productId: string;
   variantId: string;
+  previousPrice: string;
   price: string;
+  currencyCode: string;
 }> {
   assertProductGid(input.productId);
   assertVariantGid(input.variantId);
   const price = normalizePrice(input.price);
+  const snapshot = await adminGraphql<{
+    shop: { currencyCode: string };
+    node: null | { id: string; price: string; product: { id: string } };
+  }>(VARIANT_PRICE_LOOKUP_QUERY, { variantId: input.variantId });
+  const current = snapshot.node;
+  if (!current || current.product.id !== input.productId) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "That variant does not belong to the selected product." });
+  }
+
   const data = await adminGraphql<{
     productVariantsBulkUpdate: {
       productVariants: Array<{ id: string; price: string }> | null;
@@ -674,7 +699,13 @@ export async function updateProductVariantPrice(input: UpdateVariantPriceInput):
   throwUserErrors(data.productVariantsBulkUpdate.userErrors, "variant price update");
   const variant = data.productVariantsBulkUpdate.productVariants?.find(item => item.id === input.variantId);
   if (!variant) throw new TRPCError({ code: "NOT_FOUND", message: "Shopify did not update that product variant." });
-  return { productId: input.productId, variantId: variant.id, price: variant.price };
+  return {
+    productId: input.productId,
+    variantId: variant.id,
+    previousPrice: current.price,
+    price: variant.price,
+    currencyCode: snapshot.shop.currencyCode,
+  };
 }
 
 export async function setVariantInventory(input: SetVariantInventoryInput): Promise<{

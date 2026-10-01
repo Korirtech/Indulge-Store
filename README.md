@@ -8,7 +8,7 @@ A premium, mobile-first Kenyan essentials storefront concept for English-languag
 - Express + tRPC backend; Shopify headless storefront adapter and normalized commerce types.
 - Managed MySQL/TiDB + Drizzle and Manus OAuth scaffold.
 - Shopify is intended to own products, variants, prices, stock, cart and hosted checkout.
-- Protected `/admin/catalog` dashboard for store admins to search products, add or manage existing product images, edit variant prices, and update location-level available stock; Shopify Admin credentials stay server-side.
+- Protected `/admin/catalog` dashboard for store admins to search products, manage images, edit variant prices, update location-level stock, and review a database-backed audit trail for dashboard writes; Shopify Admin credentials stay server-side.
 - Single-vendor launch model; marketplace functionality stays disabled.
 
 ## Run / validate
@@ -21,6 +21,8 @@ pnpm shopify:probe
 ```
 
 The live Shopify probe requires a connected, claimed development store, server-side Shopify storefront token, and at least one active published product with an image and positive price. A passing local typecheck is not proof of live checkout or payment readiness.
+
+Run `pnpm db:push` against the intended MySQL/TiDB database before using the audit history or allowing catalog mutations; this applies the `admin_audit_logs` migration.
 
 ## Setup still required
 
@@ -38,5 +40,6 @@ The live Shopify probe requires a connected, claimed development store, server-s
 - [Deployment guide](./DEPLOYMENT.md)
 - [Security notes](./SECURITY.md)
 - [Testing plan](./TESTING.md)
+- [Owner launch checklist](./LAUNCH_CHECKLIST.md)
 
 The original request describes a full commercial platform. This repository is the foundation and first storefront milestone; features not implemented or verified are explicitly called out rather than represented as working production capabilities.

@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { adminAuditLogs, InsertAdminAuditLog, InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,57 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export type NewAdminAuditLog = Pick<
+  InsertAdminAuditLog,
+  "actorUserId" | "action" | "targetType" | "targetId" | "status" | "metadataJson"
+>;
+
+export type AdminAuditCompletion = Pick<InsertAdminAuditLog, "status"> &
+  Partial<Pick<InsertAdminAuditLog, "beforeJson" | "afterJson" | "errorCode">>;
+
+export async function createAdminAuditLog(entry: NewAdminAuditLog): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable; the audited admin action was not executed.");
+
+  const inserted = await db.insert(adminAuditLogs).values(entry).$returningId();
+  const id = inserted[0]?.id;
+  if (typeof id !== "number") throw new Error("Database did not return the new audit record identifier.");
+  return id;
+}
+
+export async function completeAdminAuditLog(id: number, completion: AdminAuditCompletion): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable while finalizing the admin audit record.");
+
+  await db.update(adminAuditLogs)
+    .set({ ...completion, completedAt: new Date() })
+    .where(eq(adminAuditLogs.id, id));
+}
+
+export async function getRecentAdminAuditLogs(limit: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable while reading admin audit history.");
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error("Audit history limit must be between 1 and 100.");
+  }
+
+  return db.select({
+    id: adminAuditLogs.id,
+    actorUserId: adminAuditLogs.actorUserId,
+    actorName: users.name,
+    action: adminAuditLogs.action,
+    targetType: adminAuditLogs.targetType,
+    targetId: adminAuditLogs.targetId,
+    status: adminAuditLogs.status,
+    metadataJson: adminAuditLogs.metadataJson,
+    beforeJson: adminAuditLogs.beforeJson,
+    afterJson: adminAuditLogs.afterJson,
+    errorCode: adminAuditLogs.errorCode,
+    createdAt: adminAuditLogs.createdAt,
+    completedAt: adminAuditLogs.completedAt,
+  })
+    .from(adminAuditLogs)
+    .leftJoin(users, eq(adminAuditLogs.actorUserId, users.id))
+    .orderBy(desc(adminAuditLogs.createdAt), desc(adminAuditLogs.id))
+    .limit(limit);
+}

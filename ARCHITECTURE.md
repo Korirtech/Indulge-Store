@@ -18,7 +18,7 @@ flowchart LR
   ADM --> SHOP
   SF --> SHOP[Shopify catalog, cart, checkout, order and payment settings]
   APP --> AUTH[Manus OAuth / session]
-  APP --> DB[(Managed MySQL / TiDB via Drizzle)]
+  APP -->|identity + audit events| DB[(Managed MySQL / TiDB via Drizzle)]
   UI --> ASSET[Managed image storage / CDN]
   SHOP --> PSP[Payment methods enabled in Shopify]
   PSP --> CUSTOMER[Shopify-hosted checkout]
@@ -45,7 +45,7 @@ The project scaffold provides Express, tRPC, Drizzle, MySQL/TiDB, and Manus OAut
 ### Identity and data ownership
 - Manus OAuth/session supports application identity. Guest browsing and Shopify checkout remain available independently.
 - Shopify owns products, variants, price, stock, cart, checkout, and order/payment records in this integration.
-- The application database currently owns the scaffold user identity table. Customer profile extensions, wishlists, support, analytics, and audit records belong in application-owned tables only when those features are implemented.
+- The application database owns the scaffold user identity and a catalog-admin audit table. Customer profile extensions, wishlists, support, and analytics need separate application-owned tables only when those features are implemented.
 - Do not duplicate Shopify-owned commerce records without an explicit synchronization and reconciliation design.
 
 ## 3. Security boundaries
@@ -54,7 +54,7 @@ The project scaffold provides Express, tRPC, Drizzle, MySQL/TiDB, and Manus OAut
 - All Shopify requests go through the injected server scaffold. Do not call Shopify directly from React or write a second GraphQL client.
 - Checkout is hosted by Shopify; the app does not handle card data or mark an order paid.
 - Use schema validation, server-side authorization, secure session cookies, rate limits for public mutation endpoints, and minimal personal-data collection.
-- `/admin/catalog` (alias `/admin/product-images`) uses tRPC `adminProcedure` for product search, image upload/alt text/removal, variant price changes, and location stock updates. The server validates image MIME/signature/8 MiB size and Admin identifiers; inventory writes use Shopify's current-quantity compare-and-set and idempotency. Broader administrative and seller features still require backend role checks and audit controls.
+- `/admin/catalog` (alias `/admin/product-images`) uses tRPC `adminProcedure` for product search, image upload/alt text/removal, variant price changes, location stock updates, and recent audit history. All five dashboard write paths require a durable audit intent row before calling Shopify, then store a safe success/failure outcome and relevant before/after values. The server validates image MIME/signature/8 MiB size; inventory writes use Shopify's current-quantity compare-and-set and idempotency. Other administrative and seller features still need their own authorization and audit coverage.
 
 ## 4. Roles and permission matrix
 
@@ -91,7 +91,7 @@ The live app uses tRPC at `/api/trpc` rather than hand-written REST. Current int
 - `/pages/shipping`, `/pages/returns`, `/pages/contact`, `/pages/privacy`, `/pages/terms` — clear policy/support destinations.
 
 ### Administration
-- `/admin/catalog` — owner/admin-only product gallery management, variant price editing, and per-location available-stock updates; contingent on Shopify Admin API credentials and product, file, inventory, and location scopes. `/admin/product-images` remains an alias.
+- `/admin/catalog` — owner/admin-only product search, image management, variant price editing, per-location available-stock updates, and recent dashboard audit history; requires Shopify Admin API credentials/scopes and the audit-table migration. `/admin/product-images` remains an alias.
 - Remaining later-stage routes: `/admin` dashboard; `/admin/products`; `/admin/inventory`; `/admin/orders`; `/admin/customers`; `/admin/promotions`; `/admin/reviews`; `/admin/returns`; `/admin/support`; `/admin/reports`; `/admin/settings`.
 - Admin routes must not be exposed as active capabilities until protected server procedures and role grants exist.
 

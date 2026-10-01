@@ -1,6 +1,6 @@
 # Indulge Essentials — Owner Launch Checklist
 
-These items require store-owner credentials, decisions, or real-world verification. They are **not implemented or verified** by the product-image uploader feature.
+These items require store-owner credentials, decisions, or real-world verification. The dashboard audit trail records only actions made through this application; it does not observe direct Shopify Admin changes and is not tamper-proof against a database owner.
 
 ## Store and catalog
 - [ ] Claim/confirm ownership of the Shopify development store.
@@ -14,6 +14,8 @@ These items require store-owner credentials, decisions, or real-world verificati
 
 ## Hosting and operations
 - [ ] Configure the production database, OAuth callback/origin, Storefront token, and any external Forge/storage values for the chosen host.
+- [ ] Apply the Drizzle schema migration (including `admin_audit_logs`) to each production database before enabling dashboard writes; confirm backups include the audit table.
+- [ ] Choose and document audit-log retention, export, and review ownership.
 - [ ] Configure the production domain, customer support contact, email/SMS services, analytics consent, monitoring, backups, and incident ownership.
 
 ## Commercial readiness

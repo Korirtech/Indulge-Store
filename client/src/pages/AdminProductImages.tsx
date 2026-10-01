@@ -3,9 +3,11 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  History,
   ImagePlus,
   LoaderCircle,
   Package,
+  RefreshCw,
   Search,
   ShieldCheck,
   Tag,
@@ -53,6 +55,23 @@ function errorText(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+function parseAuditJson(value: string | null): unknown {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return { unreadableAuditSnapshot: true };
+  }
+}
+
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  "product.image.upload": "Product image uploaded",
+  "product.image.alt.update": "Image alt text updated",
+  "product.image.detach": "Image removed from product",
+  "variant.price.update": "Variant price updated",
+  "inventory.available.set": "Available stock adjusted",
+};
+
 export default function AdminProductImages() {
   const { user, loading: authLoading } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -76,6 +95,7 @@ export default function AdminProductImages() {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const status = trpc.adminMedia.status.useQuery(undefined, { enabled: isAdmin });
+  const auditLogs = trpc.adminMedia.auditLogs.useQuery({ limit: 50 }, { enabled: isAdmin });
   const adminReady = Boolean(status.data?.adminApiConfigured);
   const catalog = trpc.adminMedia.catalog.useInfiniteQuery(
     { query: deferredSearch || undefined },
@@ -381,5 +401,36 @@ export default function AdminProductImages() {
       </section>
     </div>
     <p className="catalog-dashboard__footnote"><ShieldCheck size={14} /> Protected by the store admin role. Price and stock changes are written to Shopify; inventory updates use a stale-value check before saving.</p>
+
+    <section className="admin-audit" aria-labelledby="admin-audit-title">
+      <header className="admin-audit__header">
+        <div><p className="eyebrow">SECURITY &amp; ACCOUNTABILITY</p><h2 id="admin-audit-title"><History size={20} /> Recent admin activity</h2><p>Successful, failed, and in-progress changes made through this dashboard.</p></div>
+        <button type="button" className="admin-audit__refresh" onClick={() => void auditLogs.refetch()} disabled={auditLogs.isFetching}><RefreshCw className={auditLogs.isFetching ? "spin" : ""} size={15} /> Refresh</button>
+      </header>
+      <p className="admin-audit__scope">This history starts when auditing is enabled. Actions made directly in Shopify Admin are not included. An in-progress record may mean a request ended before its outcome could be saved; verify Shopify before retrying.</p>
+      {auditLogs.isLoading && <div className="admin-images__loading"><LoaderCircle className="spin" size={18} /> Loading audit history…</div>}
+      {auditLogs.isError && <div className="admin-images__inline-error">Audit history is unavailable. Check the app database migration and refresh.</div>}
+      {!auditLogs.isLoading && !auditLogs.isError && auditLogs.data?.length === 0 && <div className="admin-images__empty">No dashboard changes have been recorded yet.</div>}
+      {auditLogs.data && auditLogs.data.length > 0 && <ol className="admin-audit__list">
+        {auditLogs.data.map(entry => {
+          const timestamp = new Date(entry.createdAt);
+          const details = {
+            metadata: parseAuditJson(entry.metadataJson),
+            before: parseAuditJson(entry.beforeJson),
+            after: parseAuditJson(entry.afterJson),
+            ...(entry.errorCode ? { errorCode: entry.errorCode } : {}),
+          };
+          return <li className={`admin-audit__row admin-audit__row--${entry.status}`} key={entry.id}>
+            <span className="admin-audit__icon" aria-hidden="true">{entry.status === "succeeded" ? <Check size={16} /> : entry.status === "failed" ? <X size={16} /> : <LoaderCircle className="spin" size={16} />}</span>
+            <div className="admin-audit__main">
+              <div className="admin-audit__title"><strong>{AUDIT_ACTION_LABELS[entry.action] ?? entry.action}</strong><span>{entry.status}</span></div>
+              <p>{entry.actorName || `Admin #${entry.actorUserId}`} · {entry.targetType} · {entry.targetId}</p>
+              <time dateTime={timestamp.toISOString()}>{timestamp.toLocaleString()}</time>
+            </div>
+            <details className="admin-audit__details"><summary>Details</summary><pre>{JSON.stringify(details, null, 2)}</pre></details>
+          </li>;
+        })}
+      </ol>}
+    </section>
   </section>;
 }

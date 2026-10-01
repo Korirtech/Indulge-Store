@@ -3,7 +3,7 @@
 ## Automated checks in the repository
 
 - `pnpm check` — TypeScript compile check.
-- `pnpm test` — Vitest suite, including the scaffold auth logout test, Shopify commerce tests, protected Admin API validation/authorization tests, and the live Shopify smoke test when credentials/catalog are present.
+- `pnpm test` — Vitest suite, including the scaffold auth logout test, Shopify commerce tests, protected Admin API validation/authorization tests, audit success/failure/fail-closed behavior, and the live Shopify smoke test when credentials/catalog are present.
 - `pnpm build` — production bundle and Node server build.
 - `pnpm shopify:probe` — optional live normalized-catalog probe; requires an active published product with title, image and positive price.
 
@@ -28,6 +28,9 @@ Record actual command results in the delivery summary; do not equate a skipped l
 4. Add a JPG, PNG, and WebP image; confirm unsupported MIME/signature, zero-byte, oversized, and more-than-eight-file batches are rejected.
 5. Change a variant price and verify the saved value is reflected by Shopify.
 6. Set available stock at a selected active location; confirm a stale expected quantity causes a conflict and does not overwrite newer stock.
+7. Verify every image, price, and inventory mutation creates an audit row with the correct actor, target, status, and safe before/after details; force a Shopify error and confirm only the error code is retained.
+8. Confirm the audit panel is admin-only, lists recent events in local time, caps its result count, and explains that direct Shopify Admin changes are outside this log.
+9. Simulate audit database unavailability and confirm the dashboard does not issue an unlogged Shopify write.
 
 ## Production commerce tests (not completed until credentials are configured)
 

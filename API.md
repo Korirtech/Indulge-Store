@@ -20,6 +20,7 @@ The generated application exposes typed tRPC under `/api/trpc`; it is not curren
 | `commerce.cart.updateLines` | Mutation | `{ cartId: string; lines: { lineId: string; quantity: number }[] }` | Updated `Cart`; quantity zero removes a line |
 | `commerce.cart.removeLines` | Mutation | `{ cartId: string; lineIds: string[] }` | Updated `Cart` |
 | `adminMedia.status` | Query | none | Admin-only; reports whether Shopify Admin API configuration is present without exposing credentials |
+| `adminMedia.auditLogs` | Query | `{ limit: 1..100 }` | Admin-only; returns recent dashboard write events, safe snapshots, status, actor display name/internal ID and timestamps; does not expose the actor's open ID |
 | `adminMedia.catalog` | Infinite query | `{ query?, cursor? }` | Admin-only; searchable, cursor-paginated Shopify products and store currency |
 | `adminMedia.productDetails` | Query | `{ productId }` | Admin-only; first 100 product images and first 250 variants, including location-level available quantities |
 | `adminMedia.locations` | Query | none | Admin-only; active Shopify inventory locations |
@@ -29,7 +30,7 @@ The generated application exposes typed tRPC under `/api/trpc`; it is not curren
 | `adminMedia.updateVariantPrice` | Mutation | `{ productId, variantId, price }` | Admin-only; updates one variant price, with a non-negative amount and up to 2 decimal places |
 | `adminMedia.setInventory` | Mutation | `{ productId, variantId, locationId, quantity, expectedCurrent, idempotencyKey }` | Admin-only; sets available stock only when Shopify's current value still matches `expectedCurrent`; stale edits return `CONFLICT` |
 
-Normalized storefront commerce contracts are declared in `shared/commerce/types.ts`. Never return raw Shopify GraphQL responses, private tokens, or Admin API credentials to a browser. The dashboard requires a server-only `SHOPIFY_ADMIN_ACCESS_TOKEN` with `read_products`, `write_products`, `write_files`, `read_inventory`, `write_inventory`, and `read_locations`; the Shopify staff user also needs matching Admin permissions. Inventory updates use Shopify's `changeFromQuantity` compare-and-set and `@idempotent` directive.
+Normalized storefront commerce contracts are declared in `shared/commerce/types.ts`. Never return raw Shopify GraphQL responses, private tokens, or Admin API credentials to a browser. The dashboard requires a server-only `SHOPIFY_ADMIN_ACCESS_TOKEN` with `read_products`, `write_products`, `write_files`, `read_inventory`, `write_inventory`, and `read_locations`; the Shopify staff user also needs matching Admin permissions. Inventory updates use Shopify's `changeFromQuantity` compare-and-set and `@idempotent` directive. Each dashboard mutation must create an audit intent record before contacting Shopify and records only safe error codes, not raw provider error text. The audit query is capped at 100 records.
 
 ## Planned domain API (not yet implemented)
 

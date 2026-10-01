@@ -2,15 +2,16 @@
 
 ## Current implementation
 
-The project uses the managed MySQL/TiDB database through Drizzle ORM, not PostgreSQL/Prisma. The scaffold currently has the `users` table for Manus OAuth identity (`id`, `openId`, `name`, `email`, `loginMethod`, `role`, timestamps, last sign-in). No production order or payment tables have been created.
+The project uses the managed MySQL/TiDB database through Drizzle ORM, not PostgreSQL/Prisma. App-owned tables are `users` for Manus OAuth identity and `admin_audit_logs` for audited catalog-dashboard mutations. No production order or payment tables have been created.
 
-The Shopify storefront integration is the source of truth for product, variant, price, stock availability, cart, checkout and Shopify order/payment records. The app must not create duplicate tables for those entities unless a later synchronization design defines stable external IDs, webhook verification, idempotency, reconciliation and retention.
+The Shopify storefront integration is the source of truth for product, variant, price, stock availability, cart, checkout and Shopify order/payment records. The audit table records only admin actions initiated by this app; it is not a duplicate product/order database and does not observe changes made directly in Shopify Admin.
 
-## Current identity ERD
+## Current app-owned identity and audit ERD
 
 ```mermaid
-erDiagram
-  USERS {
+  erDiagram
+    USERS ||--o{ ADMIN_AUDIT_LOGS : performs
+    USERS {
     int id PK
     varchar openId UK
     varchar name
@@ -18,13 +19,29 @@ erDiagram
     enum role
     timestamp createdAt
     timestamp updatedAt
-    timestamp lastSignedIn
-  }
-```
+      timestamp lastSignedIn
+    }
+    ADMIN_AUDIT_LOGS {
+      int id PK
+      int actorUserId
+      varchar action
+      varchar targetType
+      varchar targetId
+      enum status
+      text metadataJson
+      text beforeJson
+      text afterJson
+      varchar errorCode
+      timestamp createdAt
+      timestamp completedAt
+    }
+  ```
+
+`actorUserId` is a logical link to `users.id`; the audit table intentionally has no cascading foreign key so user-account changes cannot erase audit history. Records contain safe action metadata and before/after snapshots, never Shopify credentials, raw provider error text, or image bytes. The application exposes only the latest 100 records to an administrator; database retention is currently indefinite pending an owner policy.
 
 ## Target logical commerce ERD
 
-This is a roadmap model, not a claim that all these tables exist. Product, variant, inventory, cart, order and payment data remain Shopify-owned for the current architecture. Application-owned records are linked by provider IDs and contain only fields needed by app features.
+This is a roadmap model, not a claim that all these tables exist. Product, variant, inventory, cart, order and payment data remain Shopify-owned for the current architecture. The generic `AUDIT_LOGS` target represents future broader domain auditing; the current `admin_audit_logs` table covers catalog-dashboard writes only.
 
 ```mermaid
 erDiagram
@@ -133,4 +150,4 @@ erDiagram
 
 ## Migration workflow
 
-For schema changes: edit `drizzle/schema.ts`, generate migration SQL with the project Drizzle command, review the generated SQL, apply through the managed database workflow, and verify migration state. Do not manually claim a schema change has been applied merely because TypeScript types compile.
+For schema changes: edit `drizzle/schema.ts`, run `pnpm db:push` with the intended `DATABASE_URL`, review generated SQL, and verify migration state. The admin audit table is part of the current schema; apply its migration to each separate deployment database before running the dashboard code there. Do not manually claim a schema change has been applied merely because TypeScript types compile.
